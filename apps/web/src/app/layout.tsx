@@ -3,12 +3,13 @@ import './globals.css';
 
 import { Providers } from '@/components/providers';
 import { ServiceWorkerRegistrar } from '@/components/pwa/ServiceWorkerRegistrar';
+import { getAppBaseUrl } from '@/lib/public-env';
 
 export const metadata: Metadata = {
   title: 'chatApp',
   description: 'chatApp is a modern team collaboration platform with secure messaging.',
   applicationName: 'chatApp',
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'),
+  metadataBase: new URL(getAppBaseUrl()),
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,

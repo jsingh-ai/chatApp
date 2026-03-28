@@ -49,7 +49,15 @@ Critical production vars:
 - API: `DATABASE_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `FRONTEND_URL`, `FRONTEND_URLS`
 - Web: `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL`
 
-The frontend uses bearer tokens over HTTPS and does not depend on cross-site cookies. In production, point the web app at the public API origin and websocket origin explicitly.
+What they control:
+
+- `FRONTEND_URL`: API CORS allowlist primary origin and the base URL used in forgot-password/reset-password email links
+- `FRONTEND_URLS`: additional comma-separated frontend origins allowed by REST and websocket CORS
+- `NEXT_PUBLIC_APP_URL`: frontend canonical/PWA base URL used for metadata and manifest generation
+- `NEXT_PUBLIC_API_URL`: frontend REST API base URL
+- `NEXT_PUBLIC_WS_URL`: frontend websocket base URL without `/api`
+
+The frontend uses bearer tokens over HTTPS and does not depend on cross-site cookies. In production, those public URL vars must be set explicitly. The web app now fails fast in production if they are missing instead of silently falling back to localhost.
 
 ## Local development
 
@@ -78,24 +86,81 @@ pnpm --filter web dev
 pnpm --filter web build && pnpm --filter web start
 ```
 
-## Production deployment
+## Railway + Vercel deployment
 
-Recommended first public setup:
+Recommended hosted setup:
 
+- Backend + PostgreSQL: Railway
 - Frontend: Vercel
-- Backend: Azure App Service
-- Database: Azure Database for PostgreSQL Flexible Server
 
-High-level flow:
+### 1. Deploy the Railway backend
 
-1. Deploy PostgreSQL and capture the SSL-enabled `DATABASE_URL`.
-2. Deploy the API to Azure App Service with `FRONTEND_URL` and `FRONTEND_URLS` set to your frontend domains.
-3. Run Prisma deploy migrations against production.
-4. Seed or manually promote the first super admin account.
-5. Deploy the web app to Vercel with the production API and websocket URLs.
-6. Confirm installability via `manifest.webmanifest`, service worker registration, and mobile “Add to Home Screen”.
+Create a Railway service from this repo. The repo includes [`railway.json`](railway.json), so Railway can build and start the API from the monorepo root without extra command fixes.
 
-Detailed platform steps live in [docs/deployment.md](docs/deployment.md).
+- Build command: `pnpm railway:build`
+- Start command: `pnpm railway:start`
+- Migration command: `pnpm railway:migrate`
+
+Required Railway env vars:
+
+- `NODE_ENV=production`
+- `DATABASE_URL`
+- `JWT_SECRET`
+- `JWT_REFRESH_SECRET`
+- `JWT_EXPIRES_IN`
+- `JWT_REFRESH_EXPIRES_IN`
+- `FRONTEND_URL`
+- `FRONTEND_URLS`
+- `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASSWORD`, `MAIL_FROM` if using SMTP
+
+Notes:
+
+- The API already uses `process.env.PORT`.
+- Prisma reads `DATABASE_URL` directly from [`schema.prisma`](apps/api/prisma/schema.prisma).
+- `pnpm --filter api build` generates the Prisma client before compiling.
+- `pnpm --filter api start:prod` runs the compiled Nest app from `dist/src/main.js`.
+- CORS for REST and websockets is controlled by `FRONTEND_URL` and `FRONTEND_URLS`.
+- Forgot-password email links are generated from `FRONTEND_URL`, so this must be the public Vercel origin.
+
+### 2. Deploy PostgreSQL on Railway
+
+1. Add a PostgreSQL service in Railway.
+2. Copy the connection string into `DATABASE_URL` on the backend service.
+3. Run production migrations:
+
+```bash
+pnpm railway:migrate
+```
+
+If you want bootstrap data:
+
+```bash
+pnpm --filter api prisma:seed
+```
+
+### 3. Deploy the frontend on Vercel
+
+Create a Vercel project from the same GitHub repo with:
+
+- Root Directory: `apps/web`
+- Install Command: `pnpm install --frozen-lockfile`
+- Build Command: `pnpm build`
+- Framework Preset: `Next.js`
+
+Required Vercel env vars:
+
+- `NEXT_PUBLIC_APP_URL=https://your-frontend-domain`
+- `NEXT_PUBLIC_API_URL=https://your-railway-backend-domain/api`
+- `NEXT_PUBLIC_WS_URL=https://your-railway-backend-domain`
+
+Notes:
+
+- The frontend uses `NEXT_PUBLIC_API_URL` for REST and `NEXT_PUBLIC_WS_URL` for Socket.IO.
+- `NEXT_PUBLIC_APP_URL` drives manifest metadata, installability, and canonical app origin.
+- There is no production localhost dependency when those env vars are set.
+- The web app build is verified with `pnpm --filter web build`.
+
+Detailed platform notes live in [docs/deployment.md](docs/deployment.md).
 
 ## Testing & linting
 
@@ -144,19 +209,34 @@ This allows the app to be opened by URL and installed to phone home screens as a
 
 Before go-live, confirm all of the following:
 
-1. DNS is pointed at the Vercel frontend domain and Azure API domain.
+1. Railway backend is building with `pnpm railway:build` and starting with `pnpm railway:start`.
 2. `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_API_URL`, and `NEXT_PUBLIC_WS_URL` are set in Vercel.
-3. `DATABASE_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `FRONTEND_URL`, and `FRONTEND_URLS` are set in Azure App Service.
-4. Azure App Service WebSockets are enabled.
-5. `pnpm --filter api exec prisma migrate deploy --schema prisma/schema.prisma` has run successfully against production.
-6. `pnpm --filter api prisma:seed` has been run only if you want the demo/super-admin bootstrap data.
-7. `jsingh@fivestar.com` or your chosen initial admin has `SUPER_ADMIN`.
+3. `DATABASE_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `FRONTEND_URL`, and `FRONTEND_URLS` are set in Railway.
+4. `pnpm railway:migrate` has run successfully against production.
+5. `pnpm --filter api prisma:seed` has only been run if you want demo/bootstrap data in production.
+6. `jsingh@fivestar.com` or your chosen initial admin has `SUPER_ADMIN`.
+7. Forgot-password emails contain the public frontend origin from `FRONTEND_URL`, not localhost.
 8. `/api/docs`, login, workspace creation, invites, messaging, and password reset all work against production URLs.
 9. `https://your-domain/manifest.webmanifest` loads and the browser offers install/add-to-home-screen.
+
+## Post-deploy smoke tests
+
+Run these after Railway and Vercel are both live:
+
+1. Open the Vercel frontend URL and confirm the app loads without mixed-content or CORS errors.
+2. Log in as `jsingh@fivestar.com` and create a workspace.
+3. Create a channel and send a message, then confirm realtime delivery in a second session.
+4. Trigger forgot-password and confirm the email or logged reset link points to the Vercel frontend domain.
+5. Accept an invite from a non-admin account and confirm normal users cannot create workspaces or admin-only channels.
+6. Open `https://your-domain/manifest.webmanifest` and verify install prompt/add-to-home-screen behavior on mobile.
 
 ## Useful scripts
 
 - `pnpm db:migrate` / `pnpm db:seed`: run Prisma commands against `apps/api`.
+- `pnpm build:api` / `pnpm build:web`: cloud-friendly root build commands.
+- `pnpm start:api`: start the compiled Nest API from the repo root.
+- `pnpm railway:build` / `pnpm railway:start` / `pnpm railway:migrate`: Railway deployment commands.
+- `pnpm vercel:build`: Vercel-friendly root build command.
 - `pnpm docker:up` / `pnpm docker:down`: manage the docker-compose stack.
 
 ## Demo credentials

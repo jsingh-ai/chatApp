@@ -10,7 +10,11 @@ export const validationSchema = Joi.object({
   JWT_EXPIRES_IN: Joi.string().default('15m'),
   JWT_REFRESH_SECRET: Joi.string().min(16).required(),
   JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
-  FRONTEND_URL: Joi.string().uri().default('http://localhost:3000'),
+  FRONTEND_URL: Joi.when('NODE_ENV', {
+    is: 'production',
+    then: Joi.string().uri().required(),
+    otherwise: Joi.string().uri().default('http://localhost:3000'),
+  }),
   FRONTEND_URLS: Joi.string().allow('', null),
   MAIL_HOST: Joi.string().allow('', null),
   MAIL_PORT: Joi.number().optional(),

@@ -1,67 +1,118 @@
 # Deployment Guide
 
-## Architecture
+## Target setup
 
-- Frontend: Vercel-hosted Next.js app at `https://chat.example.com`
-- Backend: Azure App Service-hosted Nest API at `https://chat-api.example.com`
-- Database: Azure Database for PostgreSQL Flexible Server
+- Frontend: Vercel
+- Backend: Railway
+- Database: Railway PostgreSQL
 
-## Frontend on Vercel
+## Railway backend
 
-1. Import the repo into Vercel.
-2. Set the project root to `apps/web`.
-3. Keep the default install command or use `pnpm install --frozen-lockfile`.
-4. Use `pnpm build` as the build command and `pnpm start` as the start command.
-5. Add production environment variables:
-   - `NEXT_PUBLIC_APP_URL=https://chat.example.com`
-   - `NEXT_PUBLIC_API_URL=https://chat-api.example.com/api`
-   - `NEXT_PUBLIC_WS_URL=https://chat-api.example.com`
-6. Redeploy after any environment change.
+### Service settings
 
-## Backend on Azure App Service
+Create a Railway service from the GitHub repo and keep the service rooted at the repository root. The repo includes [`railway.json`](/home/jsingh/projects/chatApp/railway.json), so Railway can build and start the API from the monorepo without extra command patching.
 
-1. Create a Linux Web App for Node.js 20+.
-2. Deploy `apps/api` with `pnpm install --frozen-lockfile`.
-3. Use `pnpm build` during build and `pnpm start:prod` at runtime.
-4. Enable WebSockets in App Service configuration.
-5. Add production environment variables from `apps/api/.env.production.example`.
-6. Set `FRONTEND_URL` and `FRONTEND_URLS` to the exact frontend origins you want to allow.
+- Build command: `pnpm railway:build`
+- Start command: `pnpm railway:start`
+- Migration command: `pnpm railway:migrate`
 
-## PostgreSQL on Azure Database for PostgreSQL
+### Required environment variables
 
-1. Create a Flexible Server instance.
-2. Allow the Azure App Service outbound IPs in the database firewall.
-3. Create a `chatapp` database.
-4. Use a Prisma connection string with SSL enabled:
-   - `postgresql://USER:PASSWORD@HOST:5432/chatapp?schema=public&sslmode=require`
+Use [`apps/api/.env.production.example`](/home/jsingh/projects/chatApp/apps/api/.env.production.example) as the source of truth.
 
-## Migrations and Seed
+Required:
 
-Run these after the database and API environment variables are configured:
+- `NODE_ENV=production`
+- `DATABASE_URL`
+- `JWT_SECRET`
+- `JWT_REFRESH_SECRET`
+- `JWT_EXPIRES_IN`
+- `JWT_REFRESH_EXPIRES_IN`
+- `FRONTEND_URL`
+- `FRONTEND_URLS`
+
+Optional:
+
+- `MAIL_HOST`
+- `MAIL_PORT`
+- `MAIL_USER`
+- `MAIL_PASSWORD`
+- `MAIL_FROM`
+
+`FRONTEND_URL` must be the public Vercel frontend origin. The API uses it both for CORS and for forgot-password/reset-password links sent by email.
+
+### Railway PostgreSQL
+
+1. Add a PostgreSQL service in Railway.
+2. Copy the generated connection string into `DATABASE_URL` on the backend service.
+3. Keep SSL enabled if Railway includes it in the URL.
+
+### Production migration command
+
+Run this after the backend service has `DATABASE_URL` configured:
 
 ```bash
-pnpm --filter api prisma:generate
-pnpm --filter api exec prisma migrate deploy --schema prisma/schema.prisma
+pnpm railway:migrate
+```
+
+If you want bootstrap/demo data in production:
+
+```bash
 pnpm --filter api prisma:seed
 ```
 
-If you only need to promote the initial public admin on an existing environment, update the `User.role` value for the target email instead of reseeding the entire database.
+## Vercel frontend
 
-## Super Admin Setup
+### Project settings
+
+Create a Vercel project from the same GitHub repo with:
+
+- Root Directory: `apps/web`
+- Install Command: `pnpm install --frozen-lockfile`
+- Build Command: `pnpm build`
+- Framework Preset: `Next.js`
+- Output: default Next.js output
+
+### Required environment variables
+
+Use [`apps/web/.env.production.example`](/home/jsingh/projects/chatApp/apps/web/.env.production.example) as the source of truth.
+
+- `NEXT_PUBLIC_APP_URL=https://your-frontend-domain`
+- `NEXT_PUBLIC_API_URL=https://your-railway-backend-domain/api`
+- `NEXT_PUBLIC_WS_URL=https://your-railway-backend-domain`
+
+These are all used in production code paths. The frontend now fails fast during production build/runtime if they are missing.
+
+## Monorepo cloud commands
+
+The repo includes root-level scripts for hosted environments:
+
+- `pnpm build:api`
+- `pnpm build:web`
+- `pnpm start:api`
+- `pnpm railway:build`
+- `pnpm railway:start`
+- `pnpm railway:migrate`
+- `pnpm vercel:build`
+
+These run correctly from the repository root in a pnpm workspace, which keeps GitHub-connected Railway and Vercel deployments predictable.
+
+## Super admin bootstrap
 
 - Default seeded super admin: `jsingh@fivestar.com`
-- Password after seeding: `Password123!`
-- Change the password immediately after first sign-in.
+- Default password: `Password123!`
+- Change the password immediately after first sign-in
 
-## Websocket Notes
+## Websocket and CORS notes
 
-- The frontend websocket base URL must point to the backend origin without `/api`.
-- Azure App Service must have WebSockets enabled.
-- CORS on both REST and Socket.IO uses `FRONTEND_URL` and `FRONTEND_URLS`.
+- `NEXT_PUBLIC_WS_URL` must point to the Railway backend origin without `/api`
+- REST and Socket.IO CORS both use `FRONTEND_URL` and `FRONTEND_URLS`
+- Add every production frontend hostname you intend to serve from
 
-## Go-Live Validation
+## Final verification
 
-1. Run `pnpm build` at repo root.
-2. Confirm `https://chat.example.com/manifest.webmanifest` loads.
-3. Confirm the browser offers “Install app”.
-4. Confirm login, invite acceptance, messaging, password reset, and workspace creation work against production URLs.
+1. Run `pnpm build` locally before pushing.
+2. Confirm Railway boots with `pnpm railway:start`.
+3. Confirm forgot-password emails point at `https://your-frontend-domain/reset-password?...`.
+4. Confirm `https://your-frontend-domain/manifest.webmanifest` loads.
+5. Confirm login, workspace creation, invites, realtime messaging, and password reset work against the deployed domains.

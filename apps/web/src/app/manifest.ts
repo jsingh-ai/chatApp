@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next';
+import { getAppBaseUrl } from '@/lib/public-env';
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+const appUrl = getAppBaseUrl();
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
