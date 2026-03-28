@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-labelledby="title desc">
+  <title id="title">chatApp Apple touch icon</title>
+  <desc id="desc">Rounded dark square with a bright chat mark.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#082f49"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+  </defs>
+  <rect width="180" height="180" rx="40" fill="url(#bg)"/>
+  <path d="M45 52h90c17.121 0 31 13.879 31 31v20c0 17.121-13.879 31-31 31H88l-21 25v-25H45c-17.121 0-31-13.879-31-31V83c0-17.121 13.879-31 31-31z" fill="#e2e8f0"/>
+  <rect x="56" y="74" width="68" height="12" rx="6" fill="#0f172a"/>
+  <rect x="56" y="96" width="44" height="12" rx="6" fill="#334155"/>
+  <circle cx="132" cy="76" r="10" fill="#38bdf8"/>
+</svg>

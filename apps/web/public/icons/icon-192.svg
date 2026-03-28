@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-labelledby="title desc">
+  <title id="title">chatApp icon</title>
+  <desc id="desc">Layered chat bubbles with a cyan notification accent.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0ea5e9"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="44" fill="url(#bg)"/>
+  <rect x="28" y="34" width="136" height="96" rx="28" fill="#e2e8f0" opacity="0.95"/>
+  <path d="M58 130l14-24h62c15.464 0 28-12.536 28-28V62c0-15.464-12.536-28-28-28H58C42.536 34 30 46.536 30 62v16c0 15.464 12.536 28 28 28h0v24z" fill="#e2e8f0"/>
+  <rect x="52" y="58" width="88" height="14" rx="7" fill="#0f172a"/>
+  <rect x="52" y="82" width="56" height="14" rx="7" fill="#334155"/>
+  <path d="M118 126h-18l-12 20v-20H74c-13.255 0-24-10.745-24-24v-8h44c22.091 0 40-17.909 40-40v-6h12c13.255 0 24 10.745 24 24v30c0 13.255-10.745 24-24 24h-28z" fill="url(#panel)"/>
+  <circle cx="148" cy="70" r="12" fill="#f8fafc"/>
+</svg>

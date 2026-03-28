@@ -1,0 +1,3 @@
+-- No-op migration.
+-- The schema now uses text-backed ids from the initial migrations onward,
+-- so the historical uuid-to-text conversion is no longer needed.
